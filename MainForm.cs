@@ -655,7 +655,8 @@ public sealed class MainForm : Form
 
         if (!canInstall)
         {
-            LogHelper.Write("未发现任何离线包，已取消离线修复。");
+            LogHelper.Write("未发现任何离线包，自动进入下载离线包。");
+            await RunDownloadOfflinePackagesAsync();
             return;
         }
 
