@@ -1,0 +1,913 @@
+using System.Diagnostics;
+using System.Drawing;
+using CafeGameEnvironmentAssistant.Core;
+using Microsoft.Win32;
+
+namespace CafeGameEnvironmentAssistant;
+
+public sealed class MainForm : Form
+{
+    private readonly DataGridView _grid = new();
+    private readonly Button _healthCheckButton = new();
+    private readonly Button _repairButton = new();
+    private readonly Button _offlineRepairButton = new();
+    private readonly Button _downloadPackagesButton = new();
+    private readonly Button _firewallRepairButton = new();
+    private readonly Label _windowsFamilyLabel = new();
+    private readonly Label _windowsVersionLabel = new();
+    private readonly string _offlinePackagesDirectory = AppPaths.OfflinePackagesDirectory;
+
+    public MainForm()
+    {
+        Text = "地平线环境助手";
+        StartPosition = FormStartPosition.CenterScreen;
+        MinimumSize = new Size(980, 700);
+        Size = new Size(1160, 780);
+        BackColor = Color.FromArgb(24, 26, 31);
+        ForeColor = Color.Gainsboro;
+        Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+
+        InitializeLayout();
+        Resize += (_, _) => FitRowsToVisibleArea();
+
+        Shown += async (_, _) =>
+        {
+            LogHelper.Write("程序启动，当前进程已具备管理员权限。");
+            await RunHealthCheckAsync();
+            await CheckForPackageUpdatesOnStartupAsync();
+        };
+    }
+
+    private void InitializeLayout()
+    {
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(16),
+            BackColor = BackColor
+        };
+
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 132));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var headerPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            BackColor = BackColor
+        };
+        headerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        headerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 264));
+
+        var leftHeaderPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            BackColor = BackColor
+        };
+        leftHeaderPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
+        leftHeaderPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
+
+        var title = new Label
+        {
+            Dock = DockStyle.Fill,
+            Text = "地平线环境助手",
+            Font = new Font("Microsoft YaHei UI", 19F, FontStyle.Bold, GraphicsUnit.Point),
+            ForeColor = Color.White,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(8, 0, 0, 0)
+        };
+
+        var systemInfoPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            BackColor = Color.FromArgb(29, 33, 40),
+            Padding = new Padding(14),
+            Margin = new Padding(8, 8, 16, 8)
+        };
+        systemInfoPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 50));
+        systemInfoPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        _windowsFamilyLabel.Dock = DockStyle.Fill;
+        _windowsFamilyLabel.AutoEllipsis = false;
+        _windowsFamilyLabel.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold, GraphicsUnit.Point);
+        _windowsFamilyLabel.ForeColor = Color.White;
+        _windowsFamilyLabel.TextAlign = ContentAlignment.MiddleRight;
+
+        _windowsVersionLabel.Dock = DockStyle.Fill;
+        _windowsVersionLabel.AutoEllipsis = false;
+        _windowsVersionLabel.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Regular, GraphicsUnit.Point);
+        _windowsVersionLabel.ForeColor = Color.FromArgb(180, 188, 201);
+        _windowsVersionLabel.TextAlign = ContentAlignment.MiddleRight;
+
+        var buttonPanel = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Padding = new Padding(0, 2, 0, 8),
+            BackColor = BackColor
+        };
+
+        systemInfoPanel.Controls.Add(_windowsFamilyLabel, 0, 0);
+        systemInfoPanel.Controls.Add(_windowsVersionLabel, 0, 1);
+        leftHeaderPanel.Controls.Add(title, 0, 0);
+        leftHeaderPanel.Controls.Add(buttonPanel, 0, 1);
+        headerPanel.Controls.Add(leftHeaderPanel, 0, 0);
+        headerPanel.Controls.Add(systemInfoPanel, 1, 0);
+
+        ConfigureButton(_healthCheckButton, "刷新");
+        ConfigureButton(_repairButton, "免重启修复");
+        ConfigureButton(_offlineRepairButton, "离线修复");
+        ConfigureButton(_downloadPackagesButton, "下载离线包");
+        ConfigureButton(_firewallRepairButton, "防火墙兼容");
+
+        _healthCheckButton.Click += async (_, _) => await RunExclusiveAsync(RunHealthCheckAsync);
+        _repairButton.Click += async (_, _) => await RunExclusiveAsync(RunNoRestartRepairAsync);
+        _offlineRepairButton.Click += async (_, _) => await RunExclusiveAsync(RunOfflineXboxRepairAsync);
+        _downloadPackagesButton.Click += async (_, _) => await RunExclusiveAsync(RunDownloadOfflinePackagesAsync);
+        _firewallRepairButton.Click += async (_, _) => await RunExclusiveAsync(RunFirewallCompatibilityRepairAsync);
+
+        buttonPanel.Controls.AddRange(
+        [
+            _healthCheckButton,
+            _repairButton,
+            _offlineRepairButton,
+            _downloadPackagesButton,
+            _firewallRepairButton
+        ]);
+
+        ConfigureGrid();
+
+        root.Controls.Add(headerPanel, 0, 0);
+        root.Controls.Add(_grid, 0, 1);
+        Controls.Add(root);
+    }
+
+    private void ConfigureButton(Button button, string text)
+    {
+        button.Text = text;
+        button.Width = 148;
+        button.Height = 38;
+        button.Margin = new Padding(0, 0, 10, 0);
+        button.FlatStyle = FlatStyle.Flat;
+        button.FlatAppearance.BorderColor = Color.FromArgb(70, 76, 88);
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(54, 60, 72);
+        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(66, 74, 88);
+        button.BackColor = Color.FromArgb(38, 42, 51);
+        button.ForeColor = Color.WhiteSmoke;
+    }
+
+    private void ConfigureGrid()
+    {
+        _grid.Dock = DockStyle.Fill;
+        _grid.AllowUserToAddRows = false;
+        _grid.AllowUserToDeleteRows = false;
+        _grid.AllowUserToResizeRows = false;
+        _grid.ScrollBars = ScrollBars.None;
+        _grid.ReadOnly = true;
+        _grid.MultiSelect = false;
+        _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        _grid.BackgroundColor = Color.FromArgb(30, 33, 40);
+        _grid.BorderStyle = BorderStyle.None;
+        _grid.GridColor = Color.FromArgb(56, 62, 74);
+        _grid.RowHeadersVisible = false;
+        _grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+        _grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+        _grid.EnableHeadersVisualStyles = false;
+        _grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(42, 47, 57);
+        _grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.WhiteSmoke;
+        _grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(42, 47, 57);
+        _grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.WhiteSmoke;
+        _grid.DefaultCellStyle.BackColor = Color.FromArgb(30, 33, 40);
+        _grid.DefaultCellStyle.ForeColor = Color.Gainsboro;
+        _grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(55, 61, 74);
+        _grid.DefaultCellStyle.SelectionForeColor = Color.White;
+        _grid.RowTemplate.Height = 24;
+
+        _grid.Columns.Add("Type", "类型");
+        _grid.Columns.Add("Item", "项目");
+        _grid.Columns.Add("Status", "状态");
+        _grid.Columns.Add("Progress", "进度");
+        _grid.Columns.Add("Description", "说明");
+
+        _grid.Columns["Type"]!.Width = 170;
+        _grid.Columns["Item"]!.Width = 320;
+        _grid.Columns["Status"]!.Width = 130;
+        _grid.Columns["Progress"]!.Width = 160;
+        _grid.Columns["Progress"]!.Visible = false;
+        _grid.Columns["Description"]!.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+        _grid.Columns["Description"]!.MinimumWidth = 420;
+        _grid.CellPainting += GridOnCellPainting;
+    }
+
+    private async Task RunExclusiveAsync(Func<Task> action)
+    {
+        SetButtonsEnabled(false);
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            SetButtonsEnabled(true);
+        }
+    }
+
+    private void SetButtonsEnabled(bool enabled)
+    {
+        _healthCheckButton.Enabled = enabled;
+        _repairButton.Enabled = enabled;
+        _offlineRepairButton.Enabled = enabled;
+        _downloadPackagesButton.Enabled = enabled;
+        _firewallRepairButton.Enabled = enabled;
+    }
+
+    private async Task RunHealthCheckAsync()
+    {
+        SetProgressColumnVisible(false);
+        LogHelper.Write("开始执行刷新。");
+
+        UpdateWindowsVersionLabels();
+        var items = new List<DetectionItem>();
+
+        items.AddRange(await DetectFirewallProfilesAsync());
+        items.AddRange(DetectServices(
+        [
+            "BFE",
+            "MpsSvc",
+            "AppXSVC",
+            "ClipSVC",
+            "InstallService",
+            "BITS",
+            "wuauserv"
+        ], "核心服务"));
+
+        items.AddRange(DetectServices(
+        [
+            "GamingServices",
+            "GamingServicesNet",
+            "XblAuthManager",
+            "XblGameSave",
+            "XboxNetApiSvc",
+            "XboxGipSvc"
+        ], "Xbox 服务"));
+
+        items.Add(DetectTrustedAppsPolicy());
+        items.AddRange(DetectOfflinePackages());
+
+        BindDetectionItems(items);
+        LogHelper.Write("刷新完成。");
+    }
+
+    private async Task RunDownloadOfflinePackagesAsync()
+    {
+        try
+        {
+            SetProgressColumnVisible(true);
+            Directory.CreateDirectory(_offlinePackagesDirectory);
+            LogHelper.Write("开始刷新离线包状态。");
+            UseWaitCursor = true;
+            BindDetectionItems(GetRefreshingOfflinePackageItems());
+            await Task.Yield();
+
+            var packageInfos = await StorePackageClient.ResolveRequiredPackagesAsync();
+            var manifest = await PackageManifestStore.LoadAsync();
+            var packageStates = BuildPackageDownloadStates(packageInfos, manifest);
+            BindDetectionItems(ToDownloadDetectionItems(packageStates));
+
+            var packagesToDownload = packageStates
+                .Where(state => state.RequiresDownload)
+                .ToList();
+            if (packagesToDownload.Count == 0)
+            {
+                MessageBox.Show(
+                    "离线包已是最新。",
+                    "下载离线包",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            var downloadChoice = MessageBox.Show(
+                "发现文件未下载或需要更新，是否开始下载更新？",
+                "下载离线包",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+            if (downloadChoice != DialogResult.Yes)
+            {
+                LogHelper.Write("用户取消了离线包下载更新。");
+                return;
+            }
+
+            for (var index = 0; index < packageStates.Count; index++)
+            {
+                var state = packageStates[index];
+                if (!state.RequiresDownload)
+                {
+                    continue;
+                }
+
+                packageStates[index] = state with
+                {
+                    Status = DetectionStatus.Stopped,
+                    Description = "正在下载。",
+                    ProgressPercent = 0
+                };
+                BindDetectionItems(ToDownloadDetectionItems(packageStates));
+
+                var targetPath = Path.Combine(_offlinePackagesDirectory, state.Package.TargetFileName);
+                await StorePackageClient.DownloadPackageAsync(
+                    state.Package,
+                    targetPath,
+                    message =>
+                    {
+                        packageStates[index] = packageStates[index] with
+                        {
+                            Status = DetectionStatus.Stopped,
+                            Description = message
+                        };
+                        BindDetectionItems(ToDownloadDetectionItems(packageStates));
+                    },
+                    progress =>
+                    {
+                        packageStates[index] = packageStates[index] with
+                        {
+                            Status = DetectionStatus.Stopped,
+                            Description = progress.Percent is int percent
+                                ? $"正在下载 {percent}%"
+                                : "正在下载。",
+                            ProgressPercent = progress.Percent
+                        };
+                        BindDetectionItems(ToDownloadDetectionItems(packageStates));
+                    });
+
+                packageStates[index] = state with
+                {
+                    Status = DetectionStatus.Normal,
+                    Description = "已是最新。",
+                    RequiresDownload = false,
+                    ProgressPercent = 100
+                };
+                BindDetectionItems(ToDownloadDetectionItems(packageStates));
+                LogHelper.Write($"下载完成：{state.Package.TargetFileName}");
+            }
+
+            var manifestEntries = packageInfos
+                .Select(PackageManifestEntry.FromRemotePackage)
+                .ToList();
+            await PackageManifestStore.SaveAsync(new PackageManifest(DateTimeOffset.UtcNow, manifestEntries));
+            LogHelper.Write("已生成 packages-manifest.json。");
+
+            MessageBox.Show(
+                "离线包下载完成。",
+                "下载离线包",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+
+            await RunHealthCheckAsync();
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Write($"下载离线包失败：{ex.Message}");
+            MessageBox.Show(
+                $"下载离线包失败：{ex.Message}",
+                "下载离线包",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        finally
+        {
+            UseWaitCursor = false;
+        }
+    }
+
+    private async Task CheckForPackageUpdatesOnStartupAsync()
+    {
+        try
+        {
+            var manifest = await PackageManifestStore.LoadAsync();
+            if (manifest is null)
+            {
+                return;
+            }
+
+            var onlinePackages = await StorePackageClient.ResolveRequiredPackagesAsync();
+            if (!PackageManifestStore.HasOnlineChanges(manifest, onlinePackages))
+            {
+                return;
+            }
+
+            ShowOwnedMessageBox(
+                "文件需要更新",
+                "离线包更新",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            RestoreAndActivate();
+            LogHelper.Write("检测到线上离线包已变化。");
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Write($"启动时检查离线包更新失败：{ex.Message}");
+        }
+    }
+
+    private static IEnumerable<DetectionItem> ToDownloadDetectionItems(IEnumerable<DownloadState> states)
+    {
+        return states.Select(state =>
+            new DetectionItem("离线包", state.FileName, state.Status, state.Description, state.ProgressPercent));
+    }
+
+    private static IEnumerable<DetectionItem> GetRefreshingOfflinePackageItems()
+    {
+        return GetOfflinePackageNames().Select(packageName =>
+            new DetectionItem(
+                "离线包",
+                packageName,
+                DetectionStatus.Stopped,
+                "正在刷新线上信息。",
+                null));
+    }
+
+    private List<DownloadState> BuildPackageDownloadStates(
+        IReadOnlyList<RemotePackageInfo> packageInfos,
+        PackageManifest? manifest)
+    {
+        var manifestLookup = manifest?.Packages.ToDictionary(
+            package => package.TargetFileName,
+            StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, PackageManifestEntry>(StringComparer.OrdinalIgnoreCase);
+
+        return packageInfos
+            .Select(package =>
+            {
+                var packagePath = Path.Combine(_offlinePackagesDirectory, package.TargetFileName);
+                if (!File.Exists(packagePath))
+                {
+                    return new DownloadState(
+                        package.TargetFileName,
+                        package,
+                        DetectionStatus.Abnormal,
+                        "文件不存在。",
+                        true,
+                        0);
+                }
+
+                if (!manifestLookup.TryGetValue(package.TargetFileName, out var manifestEntry))
+                {
+                    return new DownloadState(
+                        package.TargetFileName,
+                        package,
+                        DetectionStatus.Stopped,
+                        "缺少版本记录，需要更新。",
+                        true,
+                        0);
+                }
+
+                var needsUpdate = !PackageManifestStore.Matches(manifestEntry, package);
+                return new DownloadState(
+                    package.TargetFileName,
+                    package,
+                    needsUpdate ? DetectionStatus.Stopped : DetectionStatus.Normal,
+                    needsUpdate ? "文件需要更新。" : "已是最新。",
+                    needsUpdate,
+                    needsUpdate ? 0 : 100);
+            })
+            .ToList();
+    }
+
+    private void UpdateWindowsVersionLabels()
+    {
+        var info = GetWindowsVersionInfo();
+        _windowsFamilyLabel.Text = info.Family;
+        _windowsVersionLabel.Text = info.DisplayVersion;
+    }
+
+    private static WindowsVersionInfo GetWindowsVersionInfo()
+    {
+        const string currentVersionPath = @"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
+        using var baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
+        using var key = baseKey.OpenSubKey(currentVersionPath, writable: false);
+
+        var productName = key?.GetValue("ProductName") as string;
+        var displayVersion = key?.GetValue("DisplayVersion") as string
+            ?? key?.GetValue("ReleaseId") as string
+            ?? "未知版本";
+        var buildText = key?.GetValue("CurrentBuildNumber") as string
+            ?? key?.GetValue("CurrentBuild") as string;
+        var ubr = key?.GetValue("UBR");
+
+        if (!int.TryParse(buildText, out var buildNumber))
+        {
+            var fallbackVersion = Environment.OSVersion.Version;
+            return new WindowsVersionInfo(
+                "Windows",
+                displayVersion,
+                $"Windows {fallbackVersion}");
+        }
+
+        var family = buildNumber >= 22000 ? "Windows 11" : "Windows 10";
+        var edition = GetEditionSuffix(productName);
+        var buildDisplay = ubr is int updateBuild
+            ? $"{buildNumber}.{updateBuild}"
+            : buildNumber.ToString();
+
+        return new WindowsVersionInfo(
+            family,
+            displayVersion,
+            $"{family}{edition} (Build {buildDisplay})");
+    }
+
+    private static string GetEditionSuffix(string? productName)
+    {
+        if (string.IsNullOrWhiteSpace(productName))
+        {
+            return string.Empty;
+        }
+
+        if (productName.StartsWith("Windows 10", StringComparison.OrdinalIgnoreCase))
+        {
+            return productName["Windows 10".Length..];
+        }
+
+        if (productName.StartsWith("Windows 11", StringComparison.OrdinalIgnoreCase))
+        {
+            return productName["Windows 11".Length..];
+        }
+
+        return $" {productName}";
+    }
+
+    private async Task<IEnumerable<DetectionItem>> DetectFirewallProfilesAsync()
+    {
+        var profiles = await FirewallHelper.GetProfileStatesAsync();
+        if (profiles.Count == 0)
+        {
+            return
+            [
+                new DetectionItem("防火墙", "配置文件状态", DetectionStatus.Abnormal, "未能读取防火墙配置文件状态。")
+            ];
+        }
+
+        return profiles.Select(profile =>
+            new DetectionItem(
+                "防火墙",
+                $"{profile.Name} 配置文件",
+                profile.Enabled ? DetectionStatus.Normal : DetectionStatus.Stopped,
+                profile.Enabled ? "当前为开启。" : "当前为关闭。"));
+    }
+
+    private static IEnumerable<DetectionItem> DetectServices(IEnumerable<string> serviceNames, string type)
+    {
+        foreach (var serviceName in serviceNames)
+        {
+            var info = ServiceHelper.GetServiceInfo(serviceName);
+            if (!info.Exists)
+            {
+                yield return new DetectionItem(type, serviceName, DetectionStatus.Abnormal, "服务不存在。");
+                continue;
+            }
+
+            var status = info.StartType == ServiceStartType.Disabled
+                ? DetectionStatus.Abnormal
+                : info.Status == ServiceProcessStatus.Running
+                    ? DetectionStatus.Normal
+                    : DetectionStatus.Stopped;
+
+            yield return new DetectionItem(
+                type,
+                serviceName,
+                status,
+                $"当前状态：{ServiceHelper.TranslateStatus(info.Status)}；启动类型：{ServiceHelper.TranslateStartType(info.StartType)}。");
+        }
+    }
+
+    private static DetectionItem DetectTrustedAppsPolicy()
+    {
+        const string path = @"SOFTWARE\Policies\Microsoft\Windows\Appx";
+        using var key = Registry.LocalMachine.OpenSubKey(path, writable: false);
+        var value = key?.GetValue("AllowAllTrustedApps");
+        var enabled = value is int intValue && intValue == 1;
+
+        return enabled
+            ? new DetectionItem("注册表", "AllowAllTrustedApps", DetectionStatus.Normal, "当前值为 1。")
+            : new DetectionItem("注册表", "AllowAllTrustedApps", DetectionStatus.Abnormal, "未设置为 1。");
+    }
+
+    private IEnumerable<DetectionItem> DetectOfflinePackages()
+    {
+        foreach (var packageName in GetOfflinePackageNames())
+        {
+            var fullPath = Path.Combine(_offlinePackagesDirectory, packageName);
+            yield return File.Exists(fullPath)
+                ? new DetectionItem("离线包", packageName, DetectionStatus.Normal, "文件存在。")
+                : new DetectionItem("离线包", packageName, DetectionStatus.Abnormal, "文件不存在。");
+        }
+    }
+
+    private async Task RunNoRestartRepairAsync()
+    {
+        LogHelper.Write("开始执行免重启修复。");
+
+        SetTrustedAppsPolicy();
+        await ServiceHelper.ConfigureAndStartAsync("BFE", ServiceStartType.Auto);
+        await ServiceHelper.ConfigureAndStartAsync("MpsSvc", ServiceStartType.Auto);
+        await FirewallHelper.DisableAllProfilesAsync();
+        await ServiceHelper.ConfigureAndStartAsync("AppXSVC", ServiceStartType.Demand);
+        await ServiceHelper.ConfigureAndStartAsync("ClipSVC", ServiceStartType.Demand);
+        await ServiceHelper.ConfigureAndStartAsync("InstallService", ServiceStartType.Demand);
+        await ServiceHelper.ConfigureAndStartAsync("BITS", ServiceStartType.Demand);
+        await ServiceHelper.ConfigureAndStartAsync("wuauserv", ServiceStartType.Demand);
+
+        await ServiceHelper.TryStartIfExistsAsync("GamingServices");
+        await ServiceHelper.TryStartIfExistsAsync("GamingServicesNet");
+
+        LogHelper.Write("免重启修复完成，开始重新刷新。");
+        await RunHealthCheckAsync();
+    }
+
+    private async Task RunOfflineXboxRepairAsync()
+    {
+        SetProgressColumnVisible(false);
+        Directory.CreateDirectory(_offlinePackagesDirectory);
+
+        var packageNames = GetOfflinePackageNames();
+        var packageStates = packageNames
+            .Select(packageName => new OfflinePackageState(
+                packageName,
+                File.Exists(Path.Combine(_offlinePackagesDirectory, packageName))))
+            .ToList();
+
+        BindDetectionItems(packageStates.Select(state =>
+            new DetectionItem(
+                "离线包",
+                state.FileName,
+                state.Exists ? DetectionStatus.Normal : DetectionStatus.Abnormal,
+                state.Exists ? "文件存在。" : "文件不存在。")));
+
+        var canInstall = packageStates.Any(state => state.Exists);
+
+        if (!canInstall)
+        {
+            LogHelper.Write("未发现任何离线包，已取消离线修复。");
+            return;
+        }
+
+        var installChoice = MessageBox.Show(
+            "已发现离线包，是否开始安装现有文件？",
+            "离线修复",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (installChoice != DialogResult.Yes)
+        {
+            LogHelper.Write("用户取消了离线修复安装。");
+            return;
+        }
+
+        LogHelper.Write("开始执行离线修复 Xbox。");
+        await RunNoRestartRepairAsync();
+
+        foreach (var packageName in packageNames)
+        {
+            var fullPath = Path.Combine(_offlinePackagesDirectory, packageName);
+            if (!File.Exists(fullPath))
+            {
+                LogHelper.Write($"离线包不存在，已跳过：{packageName}");
+                continue;
+            }
+
+            await AppxHelper.InstallPackageAsync(fullPath);
+        }
+
+        foreach (var processName in new[]
+                 {
+                     "GamingServices",
+                     "XboxPcApp",
+                     "XboxAppServices",
+                     "GameBar",
+                     "GameBarFTServer"
+                 })
+        {
+            KillProcessesByName(processName);
+        }
+
+        await ServiceHelper.TryStartIfExistsAsync("GamingServices");
+        await ServiceHelper.TryStartIfExistsAsync("GamingServicesNet");
+
+        LogHelper.Write("离线修复 Xbox 完成，开始重新刷新。");
+        await RunHealthCheckAsync();
+    }
+
+    private async Task RunFirewallCompatibilityRepairAsync()
+    {
+        SetProgressColumnVisible(false);
+        LogHelper.Write("开始执行防火墙兼容修复。");
+        await ServiceHelper.ConfigureAndStartAsync("BFE", ServiceStartType.Auto);
+        await ServiceHelper.ConfigureAndStartAsync("MpsSvc", ServiceStartType.Auto);
+        await FirewallHelper.DisableAllProfilesAsync();
+        LogHelper.Write("防火墙兼容修复完成：配置文件已关闭，BFE 与 MpsSvc 保持运行。");
+        await RunHealthCheckAsync();
+    }
+
+    private static void SetTrustedAppsPolicy()
+    {
+        const string path = @"SOFTWARE\Policies\Microsoft\Windows\Appx";
+        using var key = Registry.LocalMachine.CreateSubKey(path, writable: true);
+        key?.SetValue("AllowAllTrustedApps", 1, RegistryValueKind.DWord);
+        LogHelper.Write(@"已设置 HKLM\SOFTWARE\Policies\Microsoft\Windows\Appx\AllowAllTrustedApps=1。");
+    }
+
+    private static void KillProcessesByName(string processName)
+    {
+        var processes = Process.GetProcessesByName(processName);
+        if (processes.Length == 0)
+        {
+            LogHelper.Write($"未发现进程：{processName}.exe");
+            return;
+        }
+
+        foreach (var process in processes)
+        {
+            try
+            {
+                process.Kill(entireProcessTree: true);
+                LogHelper.Write($"已结束进程：{processName}.exe");
+            }
+            catch (Exception ex)
+            {
+                LogHelper.Write($"结束进程失败：{processName}.exe，{ex.Message}");
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+    }
+
+    private void BindDetectionItems(IEnumerable<DetectionItem> items)
+    {
+        _grid.Rows.Clear();
+
+        foreach (var item in items)
+        {
+            var rowIndex = _grid.Rows.Add(
+                item.Type,
+                item.Item,
+                TranslateDetectionStatus(item.Status),
+                item.ProgressPercent,
+                item.Description);
+
+            var row = _grid.Rows[rowIndex];
+            row.Cells["Status"]!.Style.ForeColor = item.Status switch
+            {
+                DetectionStatus.Normal => Color.FromArgb(96, 214, 126),
+                DetectionStatus.Stopped => Color.FromArgb(244, 196, 81),
+                _ => Color.FromArgb(240, 106, 106)
+            };
+        }
+
+        FitRowsToVisibleArea();
+    }
+
+    private void SetProgressColumnVisible(bool visible)
+    {
+        _grid.Columns["Progress"]!.Visible = visible;
+    }
+
+    private DialogResult ShowOwnedMessageBox(
+        string text,
+        string caption,
+        MessageBoxButtons buttons,
+        MessageBoxIcon icon)
+    {
+        return MessageBox.Show(this, text, caption, buttons, icon);
+    }
+
+    private void RestoreAndActivate()
+    {
+        if (WindowState == FormWindowState.Minimized)
+        {
+            WindowState = FormWindowState.Normal;
+        }
+
+        Show();
+        BringToFront();
+        Activate();
+    }
+
+    private void FitRowsToVisibleArea()
+    {
+        if (_grid.Rows.Count == 0)
+        {
+            return;
+        }
+
+        var availableHeight = _grid.ClientSize.Height - _grid.ColumnHeadersHeight - 2;
+        var fittedHeight = Math.Max(20, availableHeight / _grid.Rows.Count);
+
+        foreach (DataGridViewRow row in _grid.Rows)
+        {
+            row.Height = fittedHeight;
+        }
+    }
+
+    private static string TranslateDetectionStatus(DetectionStatus status)
+    {
+        return status switch
+        {
+            DetectionStatus.Normal => "正常",
+            DetectionStatus.Stopped => "停止",
+            _ => "异常"
+        };
+    }
+
+    private void GridOnCellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
+    {
+        if (e.RowIndex < 0 || _grid.Columns[e.ColumnIndex].Name != "Progress")
+        {
+            return;
+        }
+
+        e.PaintBackground(e.CellBounds, true);
+
+        var progress = e.Value is int value ? Math.Clamp(value, 0, 100) : 0;
+        var barBounds = new Rectangle(
+            e.CellBounds.X + 8,
+            e.CellBounds.Y + 6,
+            Math.Max(0, e.CellBounds.Width - 16),
+            Math.Max(0, e.CellBounds.Height - 12));
+
+        var graphics = e.Graphics;
+        if (graphics is null)
+        {
+            return;
+        }
+
+        using var backgroundBrush = new SolidBrush(Color.FromArgb(43, 48, 58));
+        graphics.FillRectangle(backgroundBrush, barBounds);
+
+        if (progress > 0)
+        {
+            var fillBounds = new Rectangle(
+                barBounds.X,
+                barBounds.Y,
+                Math.Max(1, barBounds.Width * progress / 100),
+                barBounds.Height);
+            using var fillBrush = new SolidBrush(Color.FromArgb(74, 181, 108));
+            graphics.FillRectangle(fillBrush, fillBounds);
+        }
+
+        var text = e.Value is int ? $"{progress}%" : string.Empty;
+        TextRenderer.DrawText(
+            graphics,
+            text,
+            _grid.Font,
+            e.CellBounds,
+            Color.Gainsboro,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+
+        e.Handled = true;
+    }
+
+    private sealed record DetectionItem(
+        string Type,
+        string Item,
+        DetectionStatus Status,
+        string Description,
+        int? ProgressPercent = null);
+    private sealed record OfflinePackageState(string FileName, bool Exists);
+    private sealed record DownloadState(
+        string FileName,
+        RemotePackageInfo Package,
+        DetectionStatus Status,
+        string Description,
+        bool RequiresDownload,
+        int? ProgressPercent);
+    private sealed record WindowsVersionInfo(string Family, string DisplayVersion, string Description);
+
+    private static string[] GetOfflinePackageNames()
+    {
+        return
+        [
+            "Microsoft.VCLibs.x64.appx",
+            "Microsoft.NET.Native.Framework.x64.appx",
+            "Microsoft.NET.Native.Runtime.x64.appx",
+            "XboxIdentityProvider.appxbundle",
+            "GamingServices.msixbundle"
+        ];
+    }
+
+    private enum DetectionStatus
+    {
+        Normal,
+        Abnormal,
+        Stopped
+    }
+}

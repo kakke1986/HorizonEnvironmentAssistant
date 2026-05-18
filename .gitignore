@@ -1,0 +1,26 @@
+# Build output
+bin/
+obj/
+bin-verify*/
+obj-verify*/
+dist/
+Launcher/bin/
+Launcher/obj/
+
+# Runtime output
+Logs/
+**/Logs/
+.horizon-runtime/
+
+# Generated payloads and downloaded offline packages
+Payload/*
+!Payload/.gitkeep
+Launcher/Payload/*
+!Launcher/Payload/.gitkeep
+OfflinePackages/*
+!OfflinePackages/.gitkeep
+
+# Archives
+*.7z
+*.zip
+*.rar
