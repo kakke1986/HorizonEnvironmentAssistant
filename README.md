@@ -126,6 +126,12 @@ dotnet publish .\Launcher\HorizonLauncher.csproj -c Release -o .\dist\HorizonEnv
 dist\HorizonEnvironmentAssistant-packed\HorizonEnvironmentAssistant.exe
 ```
 
+## 发布规则
+
+- 每次发布新版本时，都要同时更新 `CHANGELOG.md`。
+- 每次在 GitHub 创建 Release 时，都要填写版本说明。
+- GitHub Release 说明可从 `.github/RELEASE_TEMPLATE.md` 复制后按当前版本补充。
+
 ## 不会执行的操作
 
 程序明确不会执行以下操作：
