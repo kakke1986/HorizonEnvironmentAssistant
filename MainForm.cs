@@ -16,6 +16,8 @@ public sealed class MainForm : Form
     private readonly Label _windowsFamilyLabel = new();
     private readonly Label _windowsVersionLabel = new();
     private readonly string _offlinePackagesDirectory = AppPaths.OfflinePackagesDirectory;
+    private static readonly TimeSpan DownloadGridRefreshInterval = TimeSpan.FromMilliseconds(120);
+    private DateTime _lastDownloadGridRefreshUtc = DateTime.MinValue;
 
     public MainForm()
     {
@@ -32,9 +34,14 @@ public sealed class MainForm : Form
 
         Shown += async (_, _) =>
         {
-            LogHelper.Write("程序启动，当前进程已具备管理员权限。");
-            await RunHealthCheckAsync();
-            await CheckForPackageUpdatesOnStartupAsync();
+            await RunSafelyAsync(
+                async () =>
+                {
+                    LogHelper.Write("程序启动，当前进程已具备管理员权限。");
+                    await RunHealthCheckAsync();
+                    await CheckForPackageUpdatesOnStartupAsync();
+                },
+                "启动初始化失败");
         };
     }
 
@@ -214,9 +221,35 @@ public sealed class MainForm : Form
         {
             await action();
         }
+        catch (Exception ex)
+        {
+            LogHelper.Write($"操作失败：{ex}");
+            ShowOwnedMessageBox(
+                $"操作失败：{ex.Message}",
+                "地平线环境助手",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
         finally
         {
             SetButtonsEnabled(true);
+        }
+    }
+
+    private async Task RunSafelyAsync(Func<Task> action, string operationName)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Write($"{operationName}：{ex}");
+            ShowOwnedMessageBox(
+                $"{operationName}：{ex.Message}",
+                "地平线环境助手",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
     }
 
@@ -280,7 +313,7 @@ public sealed class MainForm : Form
             var packageInfos = await StorePackageClient.ResolveRequiredPackagesAsync();
             var manifest = await PackageManifestStore.LoadAsync();
             var packageStates = BuildPackageDownloadStates(packageInfos, manifest);
-            BindDetectionItems(ToDownloadDetectionItems(packageStates));
+            RefreshDownloadItems(packageStates, force: true);
 
             var packagesToDownload = packageStates
                 .Where(state => state.RequiresDownload)
@@ -320,7 +353,7 @@ public sealed class MainForm : Form
                     Description = "正在下载。",
                     ProgressPercent = 0
                 };
-                BindDetectionItems(ToDownloadDetectionItems(packageStates));
+                RefreshDownloadItems(packageStates, force: true);
 
                 var targetPath = Path.Combine(_offlinePackagesDirectory, state.Package.TargetFileName);
                 await StorePackageClient.DownloadPackageAsync(
@@ -333,7 +366,7 @@ public sealed class MainForm : Form
                             Status = DetectionStatus.Stopped,
                             Description = message
                         };
-                        BindDetectionItems(ToDownloadDetectionItems(packageStates));
+                        RefreshDownloadItems(packageStates);
                     },
                     progress =>
                     {
@@ -345,7 +378,7 @@ public sealed class MainForm : Form
                                 : "正在下载。",
                             ProgressPercent = progress.Percent
                         };
-                        BindDetectionItems(ToDownloadDetectionItems(packageStates));
+                        RefreshDownloadItems(packageStates);
                     });
 
                 packageStates[index] = state with
@@ -355,7 +388,7 @@ public sealed class MainForm : Form
                     RequiresDownload = false,
                     ProgressPercent = 100
                 };
-                BindDetectionItems(ToDownloadDetectionItems(packageStates));
+                RefreshDownloadItems(packageStates, force: true);
                 LogHelper.Write($"下载完成：{state.Package.TargetFileName}");
             }
 
@@ -766,15 +799,70 @@ public sealed class MainForm : Form
                 item.Description);
 
             var row = _grid.Rows[rowIndex];
-            row.Cells["Status"]!.Style.ForeColor = item.Status switch
-            {
-                DetectionStatus.Normal => Color.FromArgb(96, 214, 126),
-                DetectionStatus.Stopped => Color.FromArgb(244, 196, 81),
-                _ => Color.FromArgb(240, 106, 106)
-            };
+            ApplyStatusColor(row, item.Status);
         }
 
         FitRowsToVisibleArea();
+    }
+
+    private void RefreshDownloadItems(IReadOnlyList<DownloadState> states, bool force = false)
+    {
+        var now = DateTime.UtcNow;
+        if (!force && now - _lastDownloadGridRefreshUtc < DownloadGridRefreshInterval)
+        {
+            return;
+        }
+
+        _lastDownloadGridRefreshUtc = now;
+        var items = ToDownloadDetectionItems(states).ToList();
+
+        if (!CanUpdateDownloadRowsInPlace(items))
+        {
+            BindDetectionItems(items);
+            return;
+        }
+
+        for (var index = 0; index < items.Count; index++)
+        {
+            var item = items[index];
+            var row = _grid.Rows[index];
+            row.Cells["Status"]!.Value = TranslateDetectionStatus(item.Status);
+            row.Cells["Progress"]!.Value = item.ProgressPercent;
+            row.Cells["Description"]!.Value = item.Description;
+            ApplyStatusColor(row, item.Status);
+        }
+
+        _grid.InvalidateColumn(_grid.Columns["Progress"]!.Index);
+    }
+
+    private bool CanUpdateDownloadRowsInPlace(IReadOnlyList<DetectionItem> items)
+    {
+        if (_grid.Rows.Count != items.Count)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < items.Count; index++)
+        {
+            var row = _grid.Rows[index];
+            if (!string.Equals(row.Cells["Type"]!.Value as string, items[index].Type, StringComparison.Ordinal)
+                || !string.Equals(row.Cells["Item"]!.Value as string, items[index].Item, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static void ApplyStatusColor(DataGridViewRow row, DetectionStatus status)
+    {
+        row.Cells["Status"]!.Style.ForeColor = status switch
+        {
+            DetectionStatus.Normal => Color.FromArgb(96, 214, 126),
+            DetectionStatus.Stopped => Color.FromArgb(244, 196, 81),
+            _ => Color.FromArgb(240, 106, 106)
+        };
     }
 
     private void SetProgressColumnVisible(bool visible)

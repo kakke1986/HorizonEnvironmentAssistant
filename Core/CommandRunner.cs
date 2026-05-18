@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Text;
-
 namespace CafeGameEnvironmentAssistant.Core;
 
 public static class CommandRunner
@@ -25,31 +24,28 @@ public static class CommandRunner
         };
 
         using var process = new Process { StartInfo = startInfo };
-        var stdout = new StringBuilder();
-        var stderr = new StringBuilder();
-
-        process.OutputDataReceived += (_, e) =>
+        if (!process.Start())
         {
-            if (e.Data is not null)
-            {
-                stdout.AppendLine(e.Data);
-            }
-        };
+            throw new InvalidOperationException($"无法启动命令：{fileName}");
+        }
 
-        process.ErrorDataReceived += (_, e) =>
+        try
         {
-            if (e.Data is not null)
-            {
-                stderr.AppendLine(e.Data);
-            }
-        };
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            await process.WaitForExitAsync(cancellationToken);
+            await Task.WhenAll(stdoutTask, stderrTask);
 
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        await process.WaitForExitAsync(cancellationToken);
-
-        return new CommandResult(process.ExitCode, stdout.ToString().Trim(), stderr.ToString().Trim());
+            return new CommandResult(
+                process.ExitCode,
+                stdoutTask.Result.Trim(),
+                stderrTask.Result.Trim());
+        }
+        catch (OperationCanceledException)
+        {
+            TryKillProcess(process);
+            throw;
+        }
     }
 
     public static Task<CommandResult> RunPowerShellAsync(
@@ -63,6 +59,21 @@ public static class CommandRunner
             $"-NoProfile -ExecutionPolicy Bypass -Command \"{escaped}\"",
             workingDirectory,
             cancellationToken);
+    }
+
+    private static void TryKillProcess(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch
+        {
+            // Ignore cleanup failures while unwinding a cancelled command.
+        }
     }
 }
 

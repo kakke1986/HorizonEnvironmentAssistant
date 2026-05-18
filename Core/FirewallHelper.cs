@@ -62,8 +62,11 @@ public static class FirewallHelper
 
     private static FirewallProfileState ReadProfile(JsonElement element)
     {
-        var name = element.GetProperty("Name").GetString() ?? "Unknown";
-        var enabled = ReadEnabledValue(element.GetProperty("Enabled"));
+        var name = element.TryGetProperty("Name", out var nameElement)
+            ? nameElement.GetString() ?? "Unknown"
+            : "Unknown";
+        var enabled = element.TryGetProperty("Enabled", out var enabledElement)
+            && ReadEnabledValue(enabledElement);
         return new FirewallProfileState(name, enabled);
     }
 

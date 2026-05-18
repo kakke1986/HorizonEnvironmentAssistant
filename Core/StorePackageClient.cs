@@ -336,6 +336,6 @@ public sealed record RemotePackageInfo(
 public sealed record DownloadProgress(long BytesReceived, long? TotalBytes)
 {
     public int? Percent => TotalBytes is > 0
-        ? (int)Math.Clamp(BytesReceived * 100 / TotalBytes.Value, 0, 100)
+        ? (int)Math.Clamp(BytesReceived * 100d / TotalBytes.Value, 0, 100)
         : null;
 }

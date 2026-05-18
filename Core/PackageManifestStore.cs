@@ -15,8 +15,23 @@ public static class PackageManifestStore
     public static async Task SaveAsync(PackageManifest manifest)
     {
         Directory.CreateDirectory(AppPaths.OfflinePackagesDirectory);
-        await using var stream = File.Create(ManifestPath);
-        await JsonSerializer.SerializeAsync(stream, manifest, JsonOptions);
+        var tempPath = $"{ManifestPath}.tmp";
+        try
+        {
+            await using (var stream = File.Create(tempPath))
+            {
+                await JsonSerializer.SerializeAsync(stream, manifest, JsonOptions);
+            }
+
+            File.Move(tempPath, ManifestPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+            {
+                File.Delete(tempPath);
+            }
+        }
     }
 
     public static async Task<PackageManifest?> LoadAsync()
@@ -26,8 +41,16 @@ public static class PackageManifestStore
             return null;
         }
 
-        await using var stream = File.OpenRead(ManifestPath);
-        return await JsonSerializer.DeserializeAsync<PackageManifest>(stream, JsonOptions);
+        try
+        {
+            await using var stream = File.OpenRead(ManifestPath);
+            return await JsonSerializer.DeserializeAsync<PackageManifest>(stream, JsonOptions);
+        }
+        catch (Exception ex) when (ex is IOException or JsonException)
+        {
+            LogHelper.Write($"读取 packages-manifest.json 失败：{ex.Message}");
+            return null;
+        }
     }
 
     public static bool HasOnlineChanges(PackageManifest manifest, IEnumerable<RemotePackageInfo> onlinePackages)

@@ -1,4 +1,6 @@
 using System.ServiceProcess;
+using System.ComponentModel;
+using System.Diagnostics;
 using Microsoft.Win32;
 
 namespace CafeGameEnvironmentAssistant.Core;
@@ -13,7 +15,7 @@ public static class ServiceHelper
             var status = MapStatus(service.Status);
             return new ServiceInfo(true, status, GetStartType(serviceName));
         }
-        catch (InvalidOperationException)
+        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
         {
             return ServiceInfo.NotFound;
         }
@@ -52,13 +54,13 @@ public static class ServiceHelper
 
             if (service.Status == ServiceControllerStatus.StartPending)
             {
-                service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(20));
+                await WaitForStatusAsync(service, ServiceControllerStatus.Running, TimeSpan.FromSeconds(20));
                 LogHelper.Write($"服务启动完成：{serviceName}");
                 return;
             }
 
             service.Start();
-            service.WaitForStatus(ServiceControllerStatus.Running, TimeSpan.FromSeconds(20));
+            await WaitForStatusAsync(service, ServiceControllerStatus.Running, TimeSpan.FromSeconds(20));
             LogHelper.Write($"已启动服务：{serviceName}");
         }
         catch (Exception ex)
@@ -152,6 +154,26 @@ public static class ServiceHelper
         return string.IsNullOrWhiteSpace(result.StandardError)
             ? result.StandardOutput
             : result.StandardError;
+    }
+
+    private static async Task WaitForStatusAsync(
+        ServiceController service,
+        ServiceControllerStatus expectedStatus,
+        TimeSpan timeout)
+    {
+        var startedAt = Stopwatch.GetTimestamp();
+        while (Stopwatch.GetElapsedTime(startedAt) < timeout)
+        {
+            service.Refresh();
+            if (service.Status == expectedStatus)
+            {
+                return;
+            }
+
+            await Task.Delay(250);
+        }
+
+        throw new System.TimeoutException($"等待服务状态超时：{service.ServiceName}");
     }
 }
 
