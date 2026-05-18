@@ -19,9 +19,6 @@
     <EmbeddedResource Include="Payload\**\*.dll;Payload\**\*.js">
       <LogicalName>payload/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="Assets\startup-confirm.jpg">
-      <LogicalName>assets/startup-confirm.jpg</LogicalName>
-    </EmbeddedResource>
   </ItemGroup>
 
 </Project>

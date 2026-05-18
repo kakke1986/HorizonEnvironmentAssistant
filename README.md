@@ -15,7 +15,6 @@
 - 一键下载所需离线包
 - 生成 `packages-manifest.json`
 - 启动时检查线上离线包是否有更新
-- 启动前显示确认窗口
 
 ## 支持的离线包
 
@@ -86,7 +85,6 @@
 |-- Payload/
 |-- MainForm.cs
 |-- Program.cs
-|-- StartupConfirmForm.cs
 `-- CafeGameEnvironmentAssistant.csproj
 ```
 

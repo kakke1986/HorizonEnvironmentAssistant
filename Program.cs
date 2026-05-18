@@ -17,13 +17,6 @@ internal static class Program
         EmbeddedPayloadHelper.ExtractAll(AppPaths.ExecutableDirectory);
         LogHelper.InitializeSession();
         ApplicationConfiguration.Initialize();
-
-        using var startupConfirmForm = new StartupConfirmForm();
-        if (startupConfirmForm.ShowDialog() != DialogResult.OK)
-        {
-            return;
-        }
-
         Application.Run(new MainForm());
     }
 }
