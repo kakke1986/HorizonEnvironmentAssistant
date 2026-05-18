@@ -18,6 +18,7 @@ public sealed class MainForm : Form
     private readonly string _offlinePackagesDirectory = AppPaths.OfflinePackagesDirectory;
     private static readonly TimeSpan DownloadGridRefreshInterval = TimeSpan.FromMilliseconds(120);
     private DateTime _lastDownloadGridRefreshUtc = DateTime.MinValue;
+    private bool _downloadWasCancelledByUser;
 
     public MainForm()
     {
@@ -335,10 +336,13 @@ public sealed class MainForm : Form
                 MessageBoxIcon.Question);
             if (downloadChoice != DialogResult.Yes)
             {
+                _downloadWasCancelledByUser = true;
                 LogHelper.Write("用户取消了离线包下载更新。");
+                await ShowOfflinePackageScanAsync();
                 return;
             }
 
+            _downloadWasCancelledByUser = false;
             for (var index = 0; index < packageStates.Count; index++)
             {
                 var state = packageStates[index];
@@ -670,29 +674,26 @@ public sealed class MainForm : Form
         SetProgressColumnVisible(false);
         Directory.CreateDirectory(_offlinePackagesDirectory);
 
-        var packageNames = GetOfflinePackageNames();
-        var packageStates = packageNames
-            .Select(packageName => new OfflinePackageState(
-                packageName,
-                File.Exists(Path.Combine(_offlinePackagesDirectory, packageName))))
-            .ToList();
-
-        BindDetectionItems(packageStates.Select(state =>
-            new DetectionItem(
-                "离线包",
-                state.FileName,
-                state.Exists ? DetectionStatus.Normal : DetectionStatus.Abnormal,
-                state.Exists ? "文件存在。" : "文件不存在。")));
+        var packageStates = await ShowOfflinePackageScanAsync();
+        var packageNames = packageStates.Select(state => state.FileName).ToArray();
 
         var canInstall = packageStates.Any(state => state.Exists);
 
         if (!canInstall)
         {
+            if (_downloadWasCancelledByUser)
+            {
+                LogHelper.Write("用户刚取消下载，保留离线修复扫描结果。");
+                _downloadWasCancelledByUser = false;
+                return;
+            }
+
             LogHelper.Write("未发现任何离线包，自动进入下载离线包。");
             await RunDownloadOfflinePackagesAsync();
             return;
         }
 
+        _downloadWasCancelledByUser = false;
         var installChoice = MessageBox.Show(
             "已发现离线包，是否开始安装现有文件？",
             "离线修复",
@@ -737,6 +738,27 @@ public sealed class MainForm : Form
 
         LogHelper.Write("离线修复 Xbox 完成，开始重新刷新。");
         await RunHealthCheckAsync();
+    }
+
+    private Task<List<OfflinePackageState>> ShowOfflinePackageScanAsync()
+    {
+        SetProgressColumnVisible(false);
+        Directory.CreateDirectory(_offlinePackagesDirectory);
+
+        var packageStates = GetOfflinePackageNames()
+            .Select(packageName => new OfflinePackageState(
+                packageName,
+                File.Exists(Path.Combine(_offlinePackagesDirectory, packageName))))
+            .ToList();
+
+        BindDetectionItems(packageStates.Select(state =>
+            new DetectionItem(
+                "离线包",
+                state.FileName,
+                state.Exists ? DetectionStatus.Normal : DetectionStatus.Abnormal,
+                state.Exists ? "文件存在。" : "文件不存在。")));
+
+        return Task.FromResult(packageStates);
     }
 
     private async Task RunFirewallCompatibilityRepairAsync()
