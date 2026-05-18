@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace HorizonEnvironmentAssistant.Launcher;
 
@@ -18,6 +19,16 @@ internal static class Program
     {
         try
         {
+            if (!HasDotNet8DesktopRuntime())
+            {
+                MessageBox.Show(
+                    "当前系统未检测到 .NET 8 Desktop Runtime。\r\n\r\n请先安装 .NET 8 Desktop Runtime 后再运行本程序。",
+                    "地平线环境助手",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
             var launcherPath = Assembly.GetExecutingAssembly().Location;
             var launcherDirectory = Path.GetDirectoryName(launcherPath)
                 ?? AppDomain.CurrentDomain.BaseDirectory;
@@ -50,6 +61,57 @@ internal static class Program
                 "地平线环境助手",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
+        }
+    }
+
+    private static bool HasDotNet8DesktopRuntime()
+    {
+        return HasDotNet8DesktopRuntimeInRegistry(RegistryView.Registry64)
+            || HasDotNet8DesktopRuntimeInRegistry(RegistryView.Registry32)
+            || HasDotNet8DesktopRuntimeInDirectory(
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "dotnet",
+                    "shared",
+                    "Microsoft.WindowsDesktop.App"))
+            || HasDotNet8DesktopRuntimeInDirectory(
+                Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                    "dotnet",
+                    "shared",
+                    "Microsoft.WindowsDesktop.App"));
+    }
+
+    private static bool HasDotNet8DesktopRuntimeInRegistry(RegistryView view)
+    {
+        try
+        {
+            using var localMachine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, view);
+            using var desktopRuntimeKey = localMachine.OpenSubKey(
+                @"SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App");
+
+            return desktopRuntimeKey?.GetSubKeyNames()
+                .Any(version => version.StartsWith("8.", StringComparison.OrdinalIgnoreCase)) == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool HasDotNet8DesktopRuntimeInDirectory(string directory)
+    {
+        try
+        {
+            return Directory.Exists(directory)
+                && Directory.EnumerateDirectories(directory)
+                    .Select(Path.GetFileName)
+                    .Any(version => !string.IsNullOrWhiteSpace(version)
+                        && version.StartsWith("8.", StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return false;
         }
     }
 
