@@ -7,6 +7,19 @@ namespace CafeGameEnvironmentAssistant;
 
 public sealed class MainForm : Form
 {
+    private static readonly Color WindowBackground = Color.FromArgb(246, 248, 251);
+    private static readonly Color Surface = Color.FromArgb(255, 255, 255);
+    private static readonly Color SurfaceMuted = Color.FromArgb(241, 245, 249);
+    private static readonly Color Border = Color.FromArgb(203, 213, 225);
+    private static readonly Color TextPrimary = Color.FromArgb(15, 23, 42);
+    private static readonly Color TextSecondary = Color.FromArgb(71, 85, 105);
+    private static readonly Color Accent = Color.FromArgb(37, 99, 235);
+    private static readonly Color AccentHover = Color.FromArgb(219, 234, 254);
+    private static readonly Color AccentDown = Color.FromArgb(191, 219, 254);
+    private static readonly Color StatusNormal = Color.FromArgb(22, 163, 74);
+    private static readonly Color StatusStopped = Color.FromArgb(180, 83, 9);
+    private static readonly Color StatusAbnormal = Color.FromArgb(220, 38, 38);
+
     private readonly DataGridView _grid = new();
     private readonly Button _healthCheckButton = new();
     private readonly Button _repairButton = new();
@@ -25,8 +38,8 @@ public sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(980, 700);
         Size = new Size(1160, 780);
-        BackColor = Color.FromArgb(24, 26, 31);
-        ForeColor = Color.Gainsboro;
+        BackColor = WindowBackground;
+        ForeColor = TextPrimary;
         Font = new Font("Microsoft YaHei UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
 
         InitializeLayout();
@@ -53,7 +66,7 @@ public sealed class MainForm : Form
             ColumnCount = 1,
             RowCount = 2,
             Padding = new Padding(16),
-            BackColor = BackColor
+            BackColor = WindowBackground
         };
 
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 132));
@@ -64,7 +77,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Fill,
             ColumnCount = 2,
             RowCount = 1,
-            BackColor = BackColor
+            BackColor = WindowBackground
         };
         headerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         headerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 264));
@@ -74,7 +87,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 2,
-            BackColor = BackColor
+            BackColor = WindowBackground
         };
         leftHeaderPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 78));
         leftHeaderPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
@@ -84,7 +97,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Fill,
             Text = "地平线环境助手",
             Font = new Font("Microsoft YaHei UI", 19F, FontStyle.Bold, GraphicsUnit.Point),
-            ForeColor = Color.White,
+            ForeColor = TextPrimary,
             TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(8, 0, 0, 0)
         };
@@ -94,7 +107,7 @@ public sealed class MainForm : Form
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 2,
-            BackColor = Color.FromArgb(29, 33, 40),
+            BackColor = Surface,
             Padding = new Padding(14),
             Margin = new Padding(8, 8, 16, 8)
         };
@@ -104,13 +117,13 @@ public sealed class MainForm : Form
         _windowsFamilyLabel.Dock = DockStyle.Fill;
         _windowsFamilyLabel.AutoEllipsis = false;
         _windowsFamilyLabel.Font = new Font("Microsoft YaHei UI", 13F, FontStyle.Bold, GraphicsUnit.Point);
-        _windowsFamilyLabel.ForeColor = Color.White;
+        _windowsFamilyLabel.ForeColor = TextPrimary;
         _windowsFamilyLabel.TextAlign = ContentAlignment.MiddleRight;
 
         _windowsVersionLabel.Dock = DockStyle.Fill;
         _windowsVersionLabel.AutoEllipsis = false;
         _windowsVersionLabel.Font = new Font("Microsoft YaHei UI", 11F, FontStyle.Regular, GraphicsUnit.Point);
-        _windowsVersionLabel.ForeColor = Color.FromArgb(180, 188, 201);
+        _windowsVersionLabel.ForeColor = TextSecondary;
         _windowsVersionLabel.TextAlign = ContentAlignment.MiddleRight;
 
         var buttonPanel = new FlowLayoutPanel
@@ -119,7 +132,7 @@ public sealed class MainForm : Form
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
             Padding = new Padding(0, 2, 0, 8),
-            BackColor = BackColor
+            BackColor = WindowBackground
         };
 
         systemInfoPanel.Controls.Add(_windowsFamilyLabel, 0, 0);
@@ -164,11 +177,11 @@ public sealed class MainForm : Form
         button.Height = 38;
         button.Margin = new Padding(0, 0, 10, 0);
         button.FlatStyle = FlatStyle.Flat;
-        button.FlatAppearance.BorderColor = Color.FromArgb(70, 76, 88);
-        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(54, 60, 72);
-        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(66, 74, 88);
-        button.BackColor = Color.FromArgb(38, 42, 51);
-        button.ForeColor = Color.WhiteSmoke;
+        button.FlatAppearance.BorderColor = Border;
+        button.FlatAppearance.MouseOverBackColor = AccentHover;
+        button.FlatAppearance.MouseDownBackColor = AccentDown;
+        button.BackColor = Surface;
+        button.ForeColor = TextPrimary;
     }
 
     private void ConfigureGrid()
@@ -181,21 +194,26 @@ public sealed class MainForm : Form
         _grid.ReadOnly = true;
         _grid.MultiSelect = false;
         _grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-        _grid.BackgroundColor = Color.FromArgb(30, 33, 40);
-        _grid.BorderStyle = BorderStyle.None;
-        _grid.GridColor = Color.FromArgb(56, 62, 74);
+        _grid.BackgroundColor = Surface;
+        _grid.BorderStyle = BorderStyle.FixedSingle;
+        _grid.GridColor = Border;
         _grid.RowHeadersVisible = false;
         _grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         _grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
         _grid.EnableHeadersVisualStyles = false;
-        _grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(42, 47, 57);
-        _grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.WhiteSmoke;
-        _grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(42, 47, 57);
-        _grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.WhiteSmoke;
-        _grid.DefaultCellStyle.BackColor = Color.FromArgb(30, 33, 40);
-        _grid.DefaultCellStyle.ForeColor = Color.Gainsboro;
-        _grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(55, 61, 74);
-        _grid.DefaultCellStyle.SelectionForeColor = Color.White;
+        _grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single;
+        _grid.ColumnHeadersDefaultCellStyle.BackColor = SurfaceMuted;
+        _grid.ColumnHeadersDefaultCellStyle.ForeColor = TextPrimary;
+        _grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = SurfaceMuted;
+        _grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextPrimary;
+        _grid.DefaultCellStyle.BackColor = Surface;
+        _grid.DefaultCellStyle.ForeColor = TextPrimary;
+        _grid.DefaultCellStyle.SelectionBackColor = AccentHover;
+        _grid.DefaultCellStyle.SelectionForeColor = TextPrimary;
+        _grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 250, 252);
+        _grid.AlternatingRowsDefaultCellStyle.ForeColor = TextPrimary;
+        _grid.AlternatingRowsDefaultCellStyle.SelectionBackColor = AccentHover;
+        _grid.AlternatingRowsDefaultCellStyle.SelectionForeColor = TextPrimary;
         _grid.RowTemplate.Height = 24;
 
         _grid.Columns.Add("Type", "类型");
@@ -949,9 +967,9 @@ public sealed class MainForm : Form
     {
         row.Cells["Status"]!.Style.ForeColor = status switch
         {
-            DetectionStatus.Normal => Color.FromArgb(96, 214, 126),
-            DetectionStatus.Stopped => Color.FromArgb(244, 196, 81),
-            _ => Color.FromArgb(240, 106, 106)
+            DetectionStatus.Normal => StatusNormal,
+            DetectionStatus.Stopped => StatusStopped,
+            _ => StatusAbnormal
         };
     }
 
@@ -1029,7 +1047,7 @@ public sealed class MainForm : Form
             return;
         }
 
-        using var backgroundBrush = new SolidBrush(Color.FromArgb(43, 48, 58));
+        using var backgroundBrush = new SolidBrush(SurfaceMuted);
         graphics.FillRectangle(backgroundBrush, barBounds);
 
         if (progress > 0)
@@ -1039,7 +1057,7 @@ public sealed class MainForm : Form
                 barBounds.Y,
                 Math.Max(1, barBounds.Width * progress / 100),
                 barBounds.Height);
-            using var fillBrush = new SolidBrush(Color.FromArgb(74, 181, 108));
+            using var fillBrush = new SolidBrush(Accent);
             graphics.FillRectangle(fillBrush, fillBounds);
         }
 
@@ -1049,7 +1067,7 @@ public sealed class MainForm : Form
             text,
             _grid.Font,
             e.CellBounds,
-            Color.Gainsboro,
+            TextPrimary,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
 
         e.Handled = true;
