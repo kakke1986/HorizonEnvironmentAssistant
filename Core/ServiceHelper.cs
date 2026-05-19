@@ -29,7 +29,14 @@ public static class ServiceHelper
             return;
         }
 
-        await ConfigureStartTypeAsync(serviceName, startType);
+        var configured = await ConfigureStartTypeAsync(serviceName, startType);
+        var serviceInfo = GetServiceInfo(serviceName);
+        if (!configured && serviceInfo.StartType == ServiceStartType.Disabled)
+        {
+            LogHelper.Write($"服务仍处于禁用状态，已跳过启动：{serviceName}");
+            return;
+        }
+
         await TryStartIfExistsAsync(serviceName);
     }
 
@@ -129,7 +136,7 @@ public static class ServiceHelper
         };
     }
 
-    private static async Task ConfigureStartTypeAsync(string serviceName, ServiceStartType startType)
+    private static async Task<bool> ConfigureStartTypeAsync(string serviceName, ServiceStartType startType)
     {
         var scValue = startType switch
         {
@@ -143,10 +150,18 @@ public static class ServiceHelper
         if (result.Succeeded)
         {
             LogHelper.Write($"已设置服务启动类型：{serviceName} -> {TranslateStartType(startType)}");
-            return;
+            return true;
         }
 
-        LogHelper.Write($"设置服务启动类型失败：{serviceName}，{GetCommandMessage(result)}");
+        LogHelper.Write($"设置服务启动类型失败：{serviceName}，{GetCommandMessage(result)}，尝试注册表方式。");
+        if (TrySetStartTypeInRegistry(serviceName, startType))
+        {
+            LogHelper.Write($"已通过注册表设置服务启动类型：{serviceName} -> {TranslateStartType(startType)}");
+            return true;
+        }
+
+        LogHelper.Write($"注册表方式设置服务启动类型失败：{serviceName}");
+        return false;
     }
 
     private static string GetCommandMessage(CommandResult result)
@@ -174,6 +189,39 @@ public static class ServiceHelper
         }
 
         throw new System.TimeoutException($"等待服务状态超时：{service.ServiceName}");
+    }
+
+    private static bool TrySetStartTypeInRegistry(string serviceName, ServiceStartType startType)
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(
+                $@"SYSTEM\CurrentControlSet\Services\{serviceName}",
+                writable: true);
+            if (key is null)
+            {
+                return false;
+            }
+
+            key.SetValue("Start", GetRegistryStartValue(startType), RegistryValueKind.DWord);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Write($"写入服务启动类型注册表失败：{serviceName}，{ex.Message}");
+            return false;
+        }
+    }
+
+    private static int GetRegistryStartValue(ServiceStartType startType)
+    {
+        return startType switch
+        {
+            ServiceStartType.Auto => 2,
+            ServiceStartType.Demand => 3,
+            ServiceStartType.Disabled => 4,
+            _ => throw new ArgumentOutOfRangeException(nameof(startType), startType, null)
+        };
     }
 }
 
