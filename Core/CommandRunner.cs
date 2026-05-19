@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text;
+
 namespace CafeGameEnvironmentAssistant.Core;
 
 public static class CommandRunner
@@ -53,10 +54,14 @@ public static class CommandRunner
         string? workingDirectory = null,
         CancellationToken cancellationToken = default)
     {
-        var escaped = command.Replace("\"", "\\\"");
+        var bootstrapCommand =
+            "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); " +
+            "$OutputEncoding = [Console]::OutputEncoding; " +
+            command;
+        var encodedCommand = Convert.ToBase64String(Encoding.Unicode.GetBytes(bootstrapCommand));
         return RunAsync(
             "powershell.exe",
-            $"-NoProfile -ExecutionPolicy Bypass -Command \"{escaped}\"",
+            $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedCommand}",
             workingDirectory,
             cancellationToken);
     }

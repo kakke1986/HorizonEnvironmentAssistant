@@ -304,6 +304,12 @@ public sealed class MainForm : Form
         try
         {
             SetProgressColumnVisible(true);
+            if (!EnsureSupportedPackageEnvironment("下载离线包"))
+            {
+                SetProgressColumnVisible(false);
+                return;
+            }
+
             Directory.CreateDirectory(_offlinePackagesDirectory);
             LogHelper.Write("开始刷新离线包状态。");
             UseWaitCursor = true;
@@ -519,8 +525,9 @@ public sealed class MainForm : Form
     private void UpdateWindowsVersionLabels()
     {
         var info = GetWindowsVersionInfo();
+        var architecture = Environment.Is64BitOperatingSystem ? "x64" : "x86";
         _windowsFamilyLabel.Text = info.Family;
-        _windowsVersionLabel.Text = info.DisplayVersion;
+        _windowsVersionLabel.Text = $"{info.DisplayVersion} {architecture}";
     }
 
     private static WindowsVersionInfo GetWindowsVersionInfo()
@@ -543,7 +550,9 @@ public sealed class MainForm : Form
             return new WindowsVersionInfo(
                 "Windows",
                 displayVersion,
-                $"Windows {fallbackVersion}");
+                $"Windows {fallbackVersion}",
+                fallbackVersion.Build,
+                fallbackVersion.Major >= 10);
         }
 
         var family = buildNumber >= 22000 ? "Windows 11" : "Windows 10";
@@ -551,11 +560,14 @@ public sealed class MainForm : Form
         var buildDisplay = ubr is int updateBuild
             ? $"{buildNumber}.{updateBuild}"
             : buildNumber.ToString();
+        var isSupported = buildNumber >= 10240;
 
         return new WindowsVersionInfo(
             family,
             displayVersion,
-            $"{family}{edition} (Build {buildDisplay})");
+            $"{family}{edition} (Build {buildDisplay})",
+            buildNumber,
+            isSupported);
     }
 
     private static string GetEditionSuffix(string? productName)
@@ -647,6 +659,11 @@ public sealed class MainForm : Form
 
     private async Task RunNoRestartRepairAsync()
     {
+        if (!EnsureSupportedPackageEnvironment("免重启修复"))
+        {
+            return;
+        }
+
         LogHelper.Write("开始执行免重启修复。");
 
         SetTrustedAppsPolicy();
@@ -669,6 +686,11 @@ public sealed class MainForm : Form
     private async Task RunOfflineXboxRepairAsync()
     {
         SetProgressColumnVisible(false);
+        if (!EnsureSupportedPackageEnvironment("离线修复"))
+        {
+            return;
+        }
+
         Directory.CreateDirectory(_offlinePackagesDirectory);
 
         var packageStates = await ShowOfflinePackageScanAsync();
@@ -698,6 +720,7 @@ public sealed class MainForm : Form
         LogHelper.Write("开始执行离线修复 Xbox。");
         await RunNoRestartRepairAsync();
 
+        var failedPackages = new List<string>();
         foreach (var packageName in packageNames)
         {
             var fullPath = Path.Combine(_offlinePackagesDirectory, packageName);
@@ -707,7 +730,11 @@ public sealed class MainForm : Form
                 continue;
             }
 
-            await AppxHelper.InstallPackageAsync(fullPath);
+            var installResult = await AppxHelper.InstallPackageAsync(fullPath);
+            if (!installResult.Succeeded)
+            {
+                failedPackages.Add(installResult.PackageFileName);
+            }
         }
 
         foreach (var processName in new[]
@@ -727,6 +754,15 @@ public sealed class MainForm : Form
 
         LogHelper.Write("离线修复 Xbox 完成，开始重新刷新。");
         await RunHealthCheckAsync();
+
+        if (failedPackages.Count > 0)
+        {
+            ShowOwnedMessageBox(
+                "部分离线包安装失败，请查看 Logs\\latest.log。\r\n\r\n" + string.Join("\r\n", failedPackages),
+                "离线修复",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+        }
     }
 
     private Task<List<OfflinePackageState>> ShowOfflinePackageScanAsync()
@@ -753,6 +789,11 @@ public sealed class MainForm : Form
     private async Task RunFirewallCompatibilityRepairAsync()
     {
         SetProgressColumnVisible(false);
+        if (!EnsureSupportedWindowsVersion("防火墙兼容"))
+        {
+            return;
+        }
+
         LogHelper.Write("开始执行防火墙兼容修复。");
         await ServiceHelper.ConfigureAndStartAsync("BFE", ServiceStartType.Auto);
         await ServiceHelper.ConfigureAndStartAsync("MpsSvc", ServiceStartType.Auto);
@@ -767,6 +808,44 @@ public sealed class MainForm : Form
         using var key = Registry.LocalMachine.CreateSubKey(path, writable: true);
         key?.SetValue("AllowAllTrustedApps", 1, RegistryValueKind.DWord);
         LogHelper.Write(@"已设置 HKLM\SOFTWARE\Policies\Microsoft\Windows\Appx\AllowAllTrustedApps=1。");
+    }
+
+    private bool EnsureSupportedPackageEnvironment(string operationName)
+    {
+        if (!EnsureSupportedWindowsVersion(operationName))
+        {
+            return false;
+        }
+
+        if (Environment.Is64BitOperatingSystem)
+        {
+            return true;
+        }
+
+        LogHelper.Write($"{operationName} 已取消：当前系统不是 64 位。");
+        ShowOwnedMessageBox(
+            "当前功能仅支持 Windows 10 / Windows 11 64 位系统。\r\n\r\n当前系统不是 64 位，已停止操作。",
+            operationName,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        return false;
+    }
+
+    private bool EnsureSupportedWindowsVersion(string operationName)
+    {
+        var info = GetWindowsVersionInfo();
+        if (info.IsSupported)
+        {
+            return true;
+        }
+
+        LogHelper.Write($"{operationName} 已取消：不支持的系统版本，Build {info.BuildNumber}。");
+        ShowOwnedMessageBox(
+            "当前程序仅支持 Windows 10 / Windows 11。\r\n\r\n当前系统版本不在支持范围内，已停止操作。",
+            operationName,
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Warning);
+        return false;
     }
 
     private static void KillProcessesByName(string processName)
@@ -990,7 +1069,12 @@ public sealed class MainForm : Form
         string Description,
         bool RequiresDownload,
         int? ProgressPercent);
-    private sealed record WindowsVersionInfo(string Family, string DisplayVersion, string Description);
+    private sealed record WindowsVersionInfo(
+        string Family,
+        string DisplayVersion,
+        string Description,
+        int BuildNumber,
+        bool IsSupported);
 
     private static string[] GetOfflinePackageNames()
     {
