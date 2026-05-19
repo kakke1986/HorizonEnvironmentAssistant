@@ -250,6 +250,7 @@ public sealed class MainForm : Form
         }
         finally
         {
+            SetBusyCursor(false);
             SetButtonsEnabled(true);
         }
     }
@@ -330,7 +331,7 @@ public sealed class MainForm : Form
 
             Directory.CreateDirectory(_offlinePackagesDirectory);
             LogHelper.Write("开始刷新离线包状态。");
-            UseWaitCursor = true;
+            SetBusyCursor(true);
             BindDetectionItems(GetRefreshingOfflinePackageItems());
             await Task.Yield();
 
@@ -338,12 +339,14 @@ public sealed class MainForm : Form
             var manifest = await PackageManifestStore.LoadAsync();
             var packageStates = BuildPackageDownloadStates(packageInfos, manifest);
             RefreshDownloadItems(packageStates, force: true);
+            SetBusyCursor(false);
 
             var packagesToDownload = packageStates
                 .Where(state => state.RequiresDownload)
                 .ToList();
             if (packagesToDownload.Count == 0)
             {
+                SetBusyCursor(false);
                 MessageBox.Show(
                     "离线包已是最新。",
                     "下载离线包",
@@ -352,6 +355,7 @@ public sealed class MainForm : Form
                 return;
             }
 
+            SetBusyCursor(false);
             var downloadChoice = MessageBox.Show(
                 "发现文件未下载或需要更新，是否开始下载更新？",
                 "下载离线包",
@@ -433,6 +437,7 @@ public sealed class MainForm : Form
         }
         catch (Exception ex)
         {
+            SetBusyCursor(false);
             LogHelper.Write($"下载离线包失败：{ex.Message}");
             MessageBox.Show(
                 $"下载离线包失败：{ex.Message}",
@@ -442,7 +447,7 @@ public sealed class MainForm : Form
         }
         finally
         {
-            UseWaitCursor = false;
+            SetBusyCursor(false);
         }
     }
 
@@ -976,6 +981,13 @@ public sealed class MainForm : Form
     private void SetProgressColumnVisible(bool visible)
     {
         _grid.Columns["Progress"]!.Visible = visible;
+    }
+
+    private void SetBusyCursor(bool isBusy)
+    {
+        UseWaitCursor = isBusy;
+        Application.UseWaitCursor = isBusy;
+        Cursor.Current = isBusy ? Cursors.WaitCursor : Cursors.Default;
     }
 
     private DialogResult ShowOwnedMessageBox(
