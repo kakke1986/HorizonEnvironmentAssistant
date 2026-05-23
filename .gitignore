@@ -4,6 +4,8 @@ obj/
 bin-verify*/
 obj-verify*/
 dist/
+publish/
+**/publish/
 Launcher/bin/
 Launcher/obj/
 
@@ -17,6 +19,7 @@ Payload/*
 !Payload/.gitkeep
 Launcher/Payload/*
 !Launcher/Payload/.gitkeep
+NetCafeGameAssistantSingleExe/WinFormsClient/Tools/GoRepairCore.exe
 OfflinePackages/*
 !OfflinePackages/.gitkeep
 

@@ -1,5 +1,17 @@
 # 版本说明
 
+## v44
+
+发布时间：2026-05-23
+
+### 新增
+
+- 新增 `NetCafeGameAssistantSingleExe` 项目，采用 C# WinForms + GoRepairCore 架构。
+- C# WinForms 负责 UI，GoRepairCore 负责检测、修复、离线安装和日志。
+- GoRepairCore.exe 编译后作为嵌入资源打进 WinForms 单 EXE。
+- WinForms 启动时自动释放 GoRepairCore 到 `C:\ProgramData\NetCafeGameAssistant\GoRepairCore.exe`。
+- 新增 `build.bat`，可一键编译 GoRepairCore 并发布最终 `网吧游戏环境助手.exe`。
+
 ## v43
 
 发布时间：2026-05-23

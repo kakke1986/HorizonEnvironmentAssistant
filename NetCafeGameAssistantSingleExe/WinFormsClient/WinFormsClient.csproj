@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>网吧游戏环境助手</AssemblyName>
+    <RootNamespace>NetCafeGameAssistant</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Tools\GoRepairCore.exe" LogicalName="Tools.GoRepairCore.exe" Condition="Exists('Tools\GoRepairCore.exe')" />
+  </ItemGroup>
+
+</Project>
