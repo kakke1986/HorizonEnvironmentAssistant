@@ -1,5 +1,15 @@
 # 版本说明
 
+## v43
+
+发布时间：2026-05-23
+
+### 新增
+
+- 增加 `XboxGipSvc`、`XboxNetApiSvc`、`XblGameSave` 对应系统 DLL 检测。
+- 免重启修复和离线修复会修复这三个 Xbox 系统服务的服务定义、启动类型、依赖项和 `ServiceDll` 注册表值。
+- 如果 `xboxgipsvc.dll`、`XboxNetApiSvc.dll`、`XblGameSave.dll` 缺失，会尝试执行 DISM / SFC 修复系统组件。
+
 ## v42
 
 发布时间：2026-05-19

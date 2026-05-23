@@ -7,6 +7,7 @@
 - 自动申请管理员权限
 - 检测 Windows 版本、系统位数、防火墙配置文件状态
 - 检测核心服务和 Xbox 服务状态
+- 检测 `XboxGipSvc`、`XboxNetApiSvc`、`XblGameSave` 对应系统 DLL
 - 检测 `AllowAllTrustedApps` 注册表项
 - 扫描 `OfflinePackages` 离线包目录
 - 执行免重启修复
@@ -49,6 +50,8 @@
 - 设置 `AllowAllTrustedApps=1`
 - 尝试启用并启动必要服务
 - 关闭防火墙配置文件，但保留防火墙服务运行
+- 修复 `XboxGipSvc`、`XboxNetApiSvc`、`XblGameSave` 的服务定义、依赖项和启动类型
+- 系统 DLL 缺失时，尝试通过 DISM / SFC 修复 Windows 组件
 - 修复后自动重新检测
 
 ### 离线修复
@@ -98,6 +101,7 @@
 - `Core/AppxHelper.cs`：离线 Appx 安装
 - `Core/StorePackageClient.cs`：商店包解析、下载和重试
 - `Core/PackageManifestStore.cs`：离线包清单保存与更新检测
+- `Core/XboxSystemServiceRepairHelper.cs`：Xbox 系统服务 DLL、依赖项和服务定义修复
 - `Core/LogHelper.cs`：日志写入
 
 ## 构建

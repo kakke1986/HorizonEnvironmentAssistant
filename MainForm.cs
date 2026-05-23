@@ -311,6 +311,7 @@ public sealed class MainForm : Form
             "XboxGipSvc"
         ], "Xbox 服务"));
 
+        items.AddRange(DetectXboxSystemServiceFiles());
         items.Add(DetectTrustedAppsPolicy());
         items.AddRange(DetectOfflinePackages());
 
@@ -657,6 +658,18 @@ public sealed class MainForm : Form
         }
     }
 
+    private static IEnumerable<DetectionItem> DetectXboxSystemServiceFiles()
+    {
+        return XboxSystemServiceRepairHelper.GetFileStates()
+            .Select(fileState => fileState.Exists
+                ? new DetectionItem("系统文件", fileState.FileName, DetectionStatus.Normal, "文件存在。")
+                : new DetectionItem(
+                    "系统文件",
+                    fileState.FileName,
+                    DetectionStatus.Abnormal,
+                    $"文件缺失；关联服务：{fileState.ServiceName}。"));
+    }
+
     private static DetectionItem DetectTrustedAppsPolicy()
     {
         const string path = @"SOFTWARE\Policies\Microsoft\Windows\Appx";
@@ -698,6 +711,7 @@ public sealed class MainForm : Form
         await ServiceHelper.ConfigureAndStartAsync("InstallService", ServiceStartType.Demand);
         await ServiceHelper.ConfigureAndStartAsync("BITS", ServiceStartType.Demand);
         await ServiceHelper.ConfigureAndStartAsync("wuauserv", ServiceStartType.Demand);
+        await XboxSystemServiceRepairHelper.RepairAsync();
 
         await ServiceHelper.TryStartIfExistsAsync("GamingServices");
         await ServiceHelper.TryStartIfExistsAsync("GamingServicesNet");
@@ -772,6 +786,7 @@ public sealed class MainForm : Form
             KillProcessesByName(processName);
         }
 
+        await XboxSystemServiceRepairHelper.RepairAsync();
         await ServiceHelper.TryStartIfExistsAsync("GamingServices");
         await ServiceHelper.TryStartIfExistsAsync("GamingServicesNet");
 
