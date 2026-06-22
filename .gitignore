@@ -1,25 +1,14 @@
-# Build output
-bin/
-obj/
-bin-verify*/
-obj-verify*/
+# Go / build output
 dist/
-publish/
-**/publish/
-Launcher/bin/
-Launcher/obj/
+*.exe
+*.test
+coverage.out
 
 # Runtime output
 Logs/
 **/Logs/
-.horizon-runtime/
 
-# Generated payloads and downloaded offline packages
-Payload/*
-!Payload/.gitkeep
-Launcher/Payload/*
-!Launcher/Payload/.gitkeep
-NetCafeGameAssistantSingleExe/WinFormsClient/Tools/GoRepairCore.exe
+# Downloaded offline packages stay local
 OfflinePackages/*
 !OfflinePackages/.gitkeep
 

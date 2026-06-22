@@ -1,155 +1,107 @@
-# 地平线环境助手
+# HorizonEnvironmentAssistant
 
-`地平线环境助手` 是一个基于 C# .NET 8 WinForms 的 Windows 工具，用于检查和修复网吧、游戏环境机中的 Xbox / Gaming Services 相关依赖，不依赖 Microsoft Store，也不会强制重启系统。
+`HorizonEnvironmentAssistant` 是一个使用 Go 重构的 Windows 环境检测与修复工具，用于处理 Xbox / Gaming Services / Appx 离线安装相关环境问题。
 
-## 功能
+当前版本主程序为 Go 单 EXE，不依赖 .NET 8 Desktop Runtime。
 
-- 自动申请管理员权限
-- 检测 Windows 版本、系统位数、防火墙配置文件状态
-- 检测核心服务和 Xbox 服务状态
-- 检测 `XboxGipSvc`、`XboxNetApiSvc`、`XblGameSave` 对应系统 DLL
-- 检测 `AllowAllTrustedApps` 注册表项
-- 扫描 `OfflinePackages` 离线包目录
-- 执行免重启修复
-- 执行防火墙兼容修复
-- 离线安装 Xbox / Gaming Services 依赖包
-- 一键下载所需离线包
-- 生成 `packages-manifest.json`
-- 启动时检查线上离线包是否有更新
+## 设计目标
 
-## 支持的离线包
+- 程序启动后立即显示界面。
+- 启动阶段不执行耗时检测，不自动联网。
+- 所有检测、修复、离线安装、下载任务都在后台 goroutine 执行，避免卡死界面。
+- 日志实时输出到右侧日志窗口，同时写入 `Logs` 目录。
+- `OfflinePackages` 目录保留在程序同目录，用于放置离线安装包。
 
-- `Microsoft.VCLibs.x64.appx`
-- `Microsoft.NET.Native.Framework.x64.appx`
-- `Microsoft.NET.Native.Runtime.x64.appx`
-- `XboxIdentityProvider.appxbundle`
-- `GamingServices.msixbundle`
+## 保留检测
 
-离线包默认放在程序同目录下的 `OfflinePackages` 文件夹中。
+- Windows 版本
+- 系统位数
+- `GamingServices`
+- `GamingServicesNet`
+- `XblAuthManager`
+- `XblGameSave`
+- `XboxGipSvc`
+- `XboxNetApiSvc`
+- `AllowAllTrustedApps` 注册表项
+- 防火墙服务状态：`BFE`、`MpsSvc`
+- `OfflinePackages` 离线包状态
 
-## 运行要求
+## 保留修复
 
-- Windows 10 / Windows 11
-- x64 系统
-- 已安装 .NET 8 Desktop Runtime
-- 需要管理员权限运行
+- 设置 `HKLM\SOFTWARE\Policies\Microsoft\Windows\Appx\AllowAllTrustedApps=1`
+- 启动 Xbox 相关服务
+- 修复 Xbox 系统服务定义
+- 重新注册 / 离线安装 Gaming Services
+- 离线安装 `.appx` / `.appxbundle` / `.msixbundle`
+- 防火墙兼容修复：关闭防火墙配置文件，但不停止 `BFE` / `MpsSvc`
 
-当前仓库提供的是源码。若使用项目内的轻量启动器打包方式，最终 EXE 不内置 .NET 8 运行时，因此目标机器仍然需要安装 .NET 8 Desktop Runtime。
-启动器会在运行主程序前自动检测该环境；如果未安装，会提示需要 `.NET 8 Desktop Runtime`，已安装时不会额外提示。
+## 界面
 
-## 主要操作
+主界面采用简洁 WinForms 风格布局：
 
-### 刷新
+- 左侧：状态卡片列表
+- 底部按钮：`刷新检测`、`免重启修复`、`离线安装`、`检查更新`、`输出日志`、`打开目录`
 
-重新检测当前系统、服务、防火墙和离线包状态。
+`检查更新` 是唯一会自动访问网络的按钮。启动时不会自动检查离线包更新。日志不再显示在界面中，点击 `输出日志` 会定位到 `Logs\latest.log`。
 
-### 免重启修复
+## 离线包目录
 
-会执行以下操作：
+离线包放在程序同目录的 `OfflinePackages` 文件夹：
 
-- 设置 `AllowAllTrustedApps=1`
-- 尝试启用并启动必要服务
-- 关闭防火墙配置文件，但保留防火墙服务运行
-- 修复 `XboxGipSvc`、`XboxNetApiSvc`、`XblGameSave` 的服务定义、依赖项和启动类型
-- 系统 DLL 缺失时，尝试通过 DISM / SFC 修复 Windows 组件
-- 修复后自动重新检测
+```text
+OfflinePackages/
+|-- Microsoft.VCLibs.x64.appx
+|-- Microsoft.NET.Native.Framework.x64.appx
+|-- Microsoft.NET.Native.Runtime.x64.appx
+|-- XboxIdentityProvider.appxbundle
+`-- GamingServices.msixbundle
+```
 
-### 离线修复
+也可以放入其他 `.appx` / `.appxbundle` / `.msixbundle` 文件，点击 `离线安装` 时会按固定依赖包优先、其他文件按名称排序安装。
 
-先扫描 `OfflinePackages`：
+## 构建
 
-- 文件存在时显示 `文件存在`
-- 文件不存在时显示 `文件不存在`
-- 如果没有发现任何可安装离线包，会自动进入 `下载离线包`
-- 只要存在可安装文件，就会提示是否开始安装
+要求：
 
-安装顺序：
+- Windows
+- Go 1.21 或更新版本
 
-1. `Microsoft.VCLibs.x64.appx`
-2. `Microsoft.NET.Native.Framework.x64.appx`
-3. `Microsoft.NET.Native.Runtime.x64.appx`
-4. `XboxIdentityProvider.appxbundle`
-5. `GamingServices.msixbundle`
+执行：
 
-### 下载离线包
+```bat
+build.bat
+```
 
-进入下载列表后会先刷新线上信息：
+输出：
 
-- 本地缺失或线上版本已变化时，提示是否下载更新
-- 下载过程中在列表中显示进度条
-- 下载完成后生成 `OfflinePackages/packages-manifest.json`
+```text
+dist\HorizonEnvironmentAssistant.exe
+dist\OfflinePackages\
+```
 
 ## 项目结构
 
 ```text
 .
-|-- Assets/
-|-- Core/
-|-- Launcher/
+|-- main.go                       # UI 和异步任务调度
+|-- detect_windows.go             # Windows / 服务 / 注册表 / 离线包检测
+|-- repair_windows.go             # 免重启修复、Xbox 服务修复、Gaming Services 修复
+|-- offline_packages_windows.go   # 离线 appx / appxbundle / msixbundle 安装
+|-- store_client.go               # 用户点击后解析并下载离线包
+|-- service_windows.go            # Windows 服务读取、配置和启动
+|-- command_windows.go            # 异步命令执行和日志捕获
+|-- logger.go                     # Logs 目录日志
+|-- manifest.go                   # packages-manifest.json
+|-- app.manifest                  # Windows common-controls v6 / DPI manifest
+|-- rsrc.syso                     # build.bat 生成的嵌入资源
 |-- OfflinePackages/
-|-- Payload/
-|-- MainForm.cs
-|-- Program.cs
-`-- CafeGameEnvironmentAssistant.csproj
+`-- build.bat
 ```
-
-### 关键模块
-
-- `Core/AdminHelper.cs`：管理员权限检测与提权
-- `Core/ServiceHelper.cs`：服务检测、启动和启动类型调整
-- `Core/FirewallHelper.cs`：防火墙状态读取和兼容修复
-- `Core/AppxHelper.cs`：离线 Appx 安装
-- `Core/StorePackageClient.cs`：商店包解析、下载和重试
-- `Core/PackageManifestStore.cs`：离线包清单保存与更新检测
-- `Core/XboxSystemServiceRepairHelper.cs`：Xbox 系统服务 DLL、依赖项和服务定义修复
-- `Core/LogHelper.cs`：日志写入
-
-## 构建
-
-### 编译主程序
-
-```powershell
-dotnet build .\CafeGameEnvironmentAssistant.csproj -c Release
-```
-
-### 发布主程序负载
-
-```powershell
-dotnet publish .\CafeGameEnvironmentAssistant.csproj -c Release -o .\Launcher\Payload /p:SelfContained=false /p:UseAppHost=true
-```
-
-### 生成轻量单 EXE 启动器
-
-```powershell
-dotnet publish .\Launcher\HorizonLauncher.csproj -c Release -o .\dist\HorizonEnvironmentAssistant-packed
-```
-
-生成后的可执行文件位于：
-
-```text
-dist\HorizonEnvironmentAssistant-packed\HorizonEnvironmentAssistant.exe
-```
-
-## 发布规则
-
-- 每次发布新版本时，都要同时更新 `CHANGELOG.md`。
-- 每次在 GitHub 创建 Release 时，都要填写版本说明。
-- GitHub Release 说明可从 `.github/RELEASE_TEMPLATE.md` 复制后按当前版本补充。
 
 ## 不会执行的操作
 
-程序明确不会执行以下操作：
-
-- `netsh winsock reset`
-- `netsh int ip reset`
-- 强制重启电脑
-- 禁用 `BFE`
-- 禁用 `MpsSvc`
-- 停止防火墙服务
-- 打开 Microsoft Store 链接
-
-## 说明
-
-- 日志保存在程序目录下的 `Logs` 文件夹。
-- `OfflinePackages` 目录默认只保留占位文件，实际安装包不提交到源码仓库。
-- `Payload` 和 `Launcher/Payload` 中的发布文件属于生成物，也不提交到源码仓库。
+- 启动时不会检查更新。
+- 不依赖 .NET 8 Desktop Runtime。
+- 不强制重启系统。
+- 不停止 `BFE` / `MpsSvc`。
+- 不打开 Microsoft Store 链接。
