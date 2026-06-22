@@ -84,8 +84,8 @@ func (a *uiApp) createMainWindow() error {
 	return MainWindow{
 		AssignTo: &a.mw,
 		Title:    "XBOX环境修复助手",
-		MinSize:  Size{Width: 820, Height: 520},
-		Size:     Size{Width: 980, Height: 620},
+		MinSize:  Size{Width: 820, Height: 480},
+		Size:     Size{Width: 980, Height: 580},
 		Font:     Font{Family: "Microsoft YaHei UI", PointSize: 9},
 		Layout:   VBox{Margins: Margins{Left: 8, Top: 8, Right: 8, Bottom: 8}, Spacing: 6},
 		Children: []Widget{
