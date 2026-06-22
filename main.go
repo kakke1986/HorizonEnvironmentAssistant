@@ -194,7 +194,6 @@ func (a *uiApp) onUpdateClicked() {
 		if err := a.checkOfflinePackageUpdates(ctx); err != nil {
 			return err
 		}
-		a.setItems(collectChecks(a.logger))
 		return nil
 	})
 }
