@@ -49,6 +49,7 @@ func (m *checkItemModel) Value(row int, col int) interface{} {
 type uiApp struct {
 	mw              *walk.MainWindow
 	table           *walk.TableView
+	aboutButton     *walk.PushButton
 	refreshButton   *walk.PushButton
 	repairButton    *walk.PushButton
 	installButton   *walk.PushButton
@@ -70,7 +71,7 @@ func main() {
 	}
 
 	if err := app.createMainWindow(); err != nil {
-		walk.MsgBox(nil, "地平线环境助手", "创建窗口失败："+err.Error(), walk.MsgBoxOK|walk.MsgBoxIconError)
+		walk.MsgBox(nil, "XBOX环境修复助手", "创建窗口失败："+err.Error(), walk.MsgBoxOK|walk.MsgBoxIconError)
 		return
 	}
 
@@ -83,15 +84,22 @@ func main() {
 func (a *uiApp) createMainWindow() error {
 	return MainWindow{
 		AssignTo: &a.mw,
-		Title:    "地平线环境助手",
+		Title:    "XBOX环境修复助手",
 		MinSize:  Size{Width: 460, Height: 320},
 		Size:     Size{Width: 520, Height: 360},
 		Font:     Font{Family: "Microsoft YaHei UI", PointSize: 9},
-		Layout:   VBox{Margins: Margins{Left: 8, Top: 8, Right: 8, Bottom: 8}, Spacing: 6},
+		Layout:   VBox{Margins: Margins{Left: 8, Top: 6, Right: 8, Bottom: 8}, Spacing: 4},
 		Children: []Widget{
-			GroupBox{
-				Title:         "状态卡片",
+			Composite{
+				Layout: HBox{MarginsZero: true},
+				Children: []Widget{
+					HSpacer{},
+					PushButton{AssignTo: &a.aboutButton, Text: "关于", MaxSize: Size{Width: 64, Height: 28}, OnClicked: a.onAboutClicked},
+				},
+			},
+			Composite{
 				StretchFactor: 1,
+				Border:        true,
 				Layout:        VBox{Margins: Margins{Left: 4, Top: 4, Right: 4, Bottom: 4}},
 				Children: []Widget{
 					TableView{
@@ -159,6 +167,14 @@ func (a *uiApp) setButtonsEnabled(enabled bool) {
 		a.installButton.SetEnabled(enabled)
 		a.updateButton.SetEnabled(enabled)
 	})
+}
+
+func (a *uiApp) onAboutClicked() {
+	walk.MsgBox(
+		a.mw,
+		"关于",
+		"XBOX环境修复助手\r\n\r\nVersion 1.0.0\r\n\r\n湖北网好科技有限公司\r\n\r\nCopyright © 2026\r\nAll Rights Reserved.",
+		walk.MsgBoxOK|walk.MsgBoxIconInformation)
 }
 
 func (a *uiApp) onRefreshClicked() {

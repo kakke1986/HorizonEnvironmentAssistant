@@ -1,0 +1,41 @@
+{
+  "FixedFileInfo": {
+    "FileVersion": {
+      "Major": 1,
+      "Minor": 0,
+      "Patch": 0,
+      "Build": 0
+    },
+    "ProductVersion": {
+      "Major": 1,
+      "Minor": 0,
+      "Patch": 0,
+      "Build": 0
+    },
+    "FileFlagsMask": "3f",
+    "FileFlags": "00",
+    "FileOS": "040004",
+    "FileType": "01",
+    "FileSubType": "00"
+  },
+  "StringFileInfo": {
+    "Comments": "",
+    "CompanyName": "湖北网好科技有限公司",
+    "FileDescription": "XBOX Gaming Services 修复工具",
+    "FileVersion": "1.0.0",
+    "InternalName": "HorizonEnvironmentAssistant",
+    "LegalCopyright": "Copyright © 2026 湖北网好科技有限公司",
+    "LegalTrademarks": "",
+    "OriginalFilename": "HorizonEnvironmentAssistant.exe",
+    "PrivateBuild": "",
+    "ProductName": "XBOX环境修复助手",
+    "ProductVersion": "1.0.0",
+    "SpecialBuild": ""
+  },
+  "VarFileInfo": {
+    "Translation": {
+      "LangID": "0804",
+      "CharsetID": "04B0"
+    }
+  }
+}

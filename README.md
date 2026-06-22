@@ -1,6 +1,6 @@
-# HorizonEnvironmentAssistant
+# XBOX环境修复助手
 
-`HorizonEnvironmentAssistant` 是一个使用 Go 重构的 Windows 环境检测与修复工具，用于处理 Xbox / Gaming Services / Appx 离线安装相关环境问题。
+`XBOX环境修复助手` 是一个使用 Go 重构的 Windows 环境检测与修复工具，用于处理 Xbox / Gaming Services / Appx 离线安装相关环境问题。
 
 当前版本主程序为 Go 单 EXE，不依赖 .NET 8 Desktop Runtime。
 
@@ -93,6 +93,7 @@ dist\OfflinePackages\
 |-- logger.go                     # Logs 目录日志
 |-- manifest.go                   # packages-manifest.json
 |-- app.manifest                  # Windows common-controls v6 / DPI manifest
+|-- versioninfo.json              # EXE 文件属性信息
 |-- rsrc.syso                     # build.bat 生成的嵌入资源
 |-- OfflinePackages/
 `-- build.bat

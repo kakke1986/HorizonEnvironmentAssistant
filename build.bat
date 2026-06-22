@@ -17,20 +17,20 @@ echo [1/4] Tidying Go modules...
 go mod tidy
 if errorlevel 1 exit /b 1
 
-echo [2/4] Generating Windows manifest resource...
-set "RSRC=rsrc"
-where rsrc >nul 2>nul
+echo [2/4] Generating Windows version resource...
+set "GOVERSIONINFO=goversioninfo"
+where goversioninfo >nul 2>nul
 if errorlevel 1 (
     for /f "delims=" %%G in ('go env GOPATH') do set "GOPATH_DIR=%%G"
-    if exist "%GOPATH_DIR%\bin\rsrc.exe" (
-        set "RSRC=%GOPATH_DIR%\bin\rsrc.exe"
+    if exist "%GOPATH_DIR%\bin\goversioninfo.exe" (
+        set "GOVERSIONINFO=%GOPATH_DIR%\bin\goversioninfo.exe"
     ) else (
-        go install github.com/akavel/rsrc@latest
+        go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
         if errorlevel 1 exit /b 1
-        set "RSRC=%GOPATH_DIR%\bin\rsrc.exe"
+        set "GOVERSIONINFO=%GOPATH_DIR%\bin\goversioninfo.exe"
     )
 )
-"%RSRC%" -manifest "app.manifest" -o "rsrc.syso"
+"%GOVERSIONINFO%" -64 -manifest "app.manifest" -o "rsrc.syso" "versioninfo.json"
 if errorlevel 1 exit /b 1
 
 echo [3/4] Building HorizonEnvironmentAssistant.exe...
