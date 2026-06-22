@@ -49,7 +49,6 @@ func (m *checkItemModel) Value(row int, col int) interface{} {
 type uiApp struct {
 	mw              *walk.MainWindow
 	table           *walk.TableView
-	aboutButton     *walk.PushButton
 	refreshButton   *walk.PushButton
 	repairButton    *walk.PushButton
 	installButton   *walk.PushButton
@@ -85,18 +84,11 @@ func (a *uiApp) createMainWindow() error {
 	return MainWindow{
 		AssignTo: &a.mw,
 		Title:    "XBOX环境修复助手",
-		MinSize:  Size{Width: 460, Height: 320},
-		Size:     Size{Width: 520, Height: 360},
+		MinSize:  Size{Width: 820, Height: 520},
+		Size:     Size{Width: 980, Height: 620},
 		Font:     Font{Family: "Microsoft YaHei UI", PointSize: 9},
-		Layout:   VBox{Margins: Margins{Left: 8, Top: 6, Right: 8, Bottom: 8}, Spacing: 4},
+		Layout:   VBox{Margins: Margins{Left: 8, Top: 8, Right: 8, Bottom: 8}, Spacing: 6},
 		Children: []Widget{
-			Composite{
-				Layout: HBox{MarginsZero: true},
-				Children: []Widget{
-					HSpacer{},
-					PushButton{AssignTo: &a.aboutButton, Text: "关于", MaxSize: Size{Width: 64, Height: 28}, OnClicked: a.onAboutClicked},
-				},
-			},
 			Composite{
 				StretchFactor: 1,
 				Border:        true,
@@ -109,11 +101,11 @@ func (a *uiApp) createMainWindow() error {
 						LastColumnStretched: true,
 						Model:               a.model,
 						Columns: []TableViewColumn{
-							{Title: "分类", Width: 72},
-							{Title: "项目", Width: 150},
-							{Title: "状态", Width: 58},
-							{Title: "进度", Width: 58},
-							{Title: "说明", Width: 260},
+							{Title: "分类", Width: 90},
+							{Title: "项目", Width: 230},
+							{Title: "状态", Width: 70},
+							{Title: "进度", Width: 80},
+							{Title: "说明", Width: 460},
 						},
 						StyleCell: a.styleStatusCell,
 					},
@@ -167,14 +159,6 @@ func (a *uiApp) setButtonsEnabled(enabled bool) {
 		a.installButton.SetEnabled(enabled)
 		a.updateButton.SetEnabled(enabled)
 	})
-}
-
-func (a *uiApp) onAboutClicked() {
-	walk.MsgBox(
-		a.mw,
-		"关于",
-		"XBOX环境修复助手\r\n\r\nVersion 1.0.0\r\n\r\n湖北网好科技有限公司\r\n\r\nCopyright © 2026\r\nAll Rights Reserved.",
-		walk.MsgBoxOK|walk.MsgBoxIconInformation)
 }
 
 func (a *uiApp) onRefreshClicked() {
